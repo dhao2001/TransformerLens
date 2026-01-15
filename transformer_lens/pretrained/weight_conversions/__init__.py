@@ -14,6 +14,7 @@ from .qwen2 import convert_qwen2_weights
 from .qwen3 import convert_qwen3_weights
 from .phi import convert_phi_weights
 from .phi3 import convert_phi3_weights
+from .phimoe import convert_phimoe_weights
 from .gemma import convert_gemma_weights
 from .mingpt import convert_mingpt_weights
 from .nanogpt import convert_nanogpt_weights

@@ -162,7 +162,8 @@ class HookedTransformer(HookedRootModule):
                 use_fast = True
                 # Phi model's fast tokenizer does not support adding a BOS token, use_fast
                 # should be False
-                if "phi" in self.cfg.tokenizer_name.lower():
+                tokenizer_name = self.cfg.tokenizer_name.lower()
+                if "phi" in tokenizer_name and "moe" not in tokenizer_name:
                     use_fast = False
                 huggingface_token = os.environ.get("HF_TOKEN", "")
                 self.set_tokenizer(
@@ -443,8 +444,7 @@ class HookedTransformer(HookedRootModule):
         attention_mask: Optional[torch.Tensor] = None,  # [batch pos]
         stop_at_layer: Optional[int] = None,
         past_kv_cache: Optional[TransformerLensKeyValueCache] = None,
-    ) -> Loss:
-        ...
+    ) -> Loss: ...
 
     @overload
     def forward(
@@ -460,8 +460,7 @@ class HookedTransformer(HookedRootModule):
         attention_mask: Optional[torch.Tensor] = None,  # [batch pos]
         stop_at_layer: Optional[int] = None,
         past_kv_cache: Optional[TransformerLensKeyValueCache] = None,
-    ) -> Loss:
-        ...
+    ) -> Loss: ...
 
     @overload
     def forward(
@@ -477,8 +476,7 @@ class HookedTransformer(HookedRootModule):
         attention_mask: Optional[torch.Tensor] = None,  # [batch pos]
         stop_at_layer: Optional[int] = None,
         past_kv_cache: Optional[TransformerLensKeyValueCache] = None,
-    ) -> Tuple[Float[torch.Tensor, "batch pos d_vocab"], Loss]:
-        ...
+    ) -> Tuple[Float[torch.Tensor, "batch pos d_vocab"], Loss]: ...
 
     @overload
     def forward(
@@ -494,8 +492,7 @@ class HookedTransformer(HookedRootModule):
         attention_mask: Optional[torch.Tensor] = None,  # [batch pos]
         stop_at_layer: Optional[int] = None,
         past_kv_cache: Optional[TransformerLensKeyValueCache] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def forward(
         self,
@@ -677,14 +674,12 @@ class HookedTransformer(HookedRootModule):
     @overload
     def run_with_cache(
         self, *model_args, return_cache_object: Literal[True] = True, **kwargs
-    ) -> Tuple[Output, ActivationCache]:
-        ...
+    ) -> Tuple[Output, ActivationCache]: ...
 
     @overload
     def run_with_cache(
         self, *model_args, return_cache_object: Literal[False], **kwargs
-    ) -> Tuple[Output, Dict[str, torch.Tensor]]:
-        ...
+    ) -> Tuple[Output, Dict[str, torch.Tensor]]: ...
 
     def run_with_cache(
         self, *model_args, return_cache_object=True, remove_batch_dim=False, **kwargs
@@ -2045,11 +2040,13 @@ class HookedTransformer(HookedRootModule):
                             top_p=top_p,
                             temperature=temperature,
                             freq_penalty=freq_penalty,
-                            tokens=torch.cat(
-                                (input_tokens, torch.cat(sampled_tokens_list, dim=1)), dim=1
-                            )
-                            if "sampled_tokens" in locals()
-                            else input_tokens,
+                            tokens=(
+                                torch.cat(
+                                    (input_tokens, torch.cat(sampled_tokens_list, dim=1)), dim=1
+                                )
+                                if "sampled_tokens" in locals()
+                                else input_tokens
+                            ),
                         ).to(get_device_for_block_index(0, self.cfg))
                     else:
                         sampled_tokens = utils.sample_logits(

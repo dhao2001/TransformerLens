@@ -39,6 +39,7 @@ from transformer_lens.pretrained.weight_conversions import (
     convert_neox_weights,
     convert_opt_weights,
     convert_phi3_weights,
+    convert_phimoe_weights,
     convert_phi_weights,
     convert_qwen2_weights,
     convert_qwen3_weights,
@@ -61,6 +62,7 @@ NEED_REMOTE_CODE_MODELS = (
     "Qwen/Qwen3-",
     "microsoft/phi-2",
     "microsoft/Phi-3-mini-4k-instruct",
+    "microsoft/Phi-3.5-MoE-instruct",
     "microsoft/phi-4",
 )
 
@@ -674,11 +676,13 @@ def convert_hf_model_config(model_name: str, **kwargs: Any) -> dict[str, Any]:
     elif architecture == "Qwen3ForCausalLM":
         cfg_dict = {
             "d_model": hf_config.hidden_size,
-            "d_head": hf_config.head_dim
-            if hasattr(hf_config, "head_dim")
-            and hf_config.head_dim is not None
-            and hf_config.head_dim > 0
-            else hf_config.hidden_size // hf_config.num_attention_heads,
+            "d_head": (
+                hf_config.head_dim
+                if hasattr(hf_config, "head_dim")
+                and hf_config.head_dim is not None
+                and hf_config.head_dim > 0
+                else hf_config.hidden_size // hf_config.num_attention_heads
+            ),
             "n_heads": hf_config.num_attention_heads,
             "n_key_value_heads": (
                 hf_config.num_key_value_heads
@@ -697,9 +701,11 @@ def convert_hf_model_config(model_name: str, **kwargs: Any) -> dict[str, Any]:
             "positional_embedding_type": "rotary",
             "rotary_base": int(hf_config.rope_theta),
             "rotary_adjacent_pairs": False,
-            "rotary_dim": hf_config.head_dim
-            if hasattr(hf_config, "head_dim") and hf_config.head_dim > 0
-            else hf_config.hidden_size // hf_config.num_attention_heads,
+            "rotary_dim": (
+                hf_config.head_dim
+                if hasattr(hf_config, "head_dim") and hf_config.head_dim > 0
+                else hf_config.hidden_size // hf_config.num_attention_heads
+            ),
             "tokenizer_prepends_bos": True,
             "final_rms": True,
             "gated_mlp": True,
@@ -755,6 +761,36 @@ def convert_hf_model_config(model_name: str, **kwargs: Any) -> dict[str, Any]:
             "gated_mlp": True,
             "parallel_attn_mlp": False,
             "rotary_dim": hf_config.hidden_size // hf_config.num_attention_heads,
+        }
+    elif architecture == "PhiMoEForCausalLM":
+        # Architecture for microsoft/phi-3.5-moe models
+        cfg_dict = {
+            "d_model": hf_config.hidden_size,
+            "d_head": hf_config.hidden_size // hf_config.num_attention_heads,
+            "n_heads": hf_config.num_attention_heads,
+            "d_mlp": hf_config.intermediate_size,
+            "n_layers": hf_config.num_hidden_layers,
+            "n_key_value_heads": (
+                hf_config.num_key_value_heads
+                if hf_config.num_key_value_heads != hf_config.num_attention_heads
+                else None
+            ),
+            "n_ctx": hf_config.max_position_embeddings,
+            "eps": hf_config.rms_norm_eps,
+            "d_vocab": hf_config.vocab_size,
+            "act_fn": hf_config.hidden_act,
+            "initializer_range": hf_config.initializer_range,
+            "normalization_type": "RMS",
+            "positional_embedding_type": "rotary",
+            "trust_remote_code": True,
+            "rotary_base": hf_config.rope_theta,
+            "use_attn_scale": True,
+            "gated_mlp": True,
+            "parallel_attn_mlp": False,
+            "rotary_dim": hf_config.hidden_size // hf_config.num_attention_heads,
+            "num_experts": hf_config.num_local_experts,
+            "experts_per_token": hf_config.num_experts_per_tok,
+            "final_rms": True,
         }
 
     elif official_model_name.startswith("google/gemma-2b"):
@@ -1304,6 +1340,8 @@ def get_pretrained_state_dict(
             state_dict = convert_phi_weights(hf_model, cfg)
         elif cfg.original_architecture == "Phi3ForCausalLM":
             state_dict = convert_phi3_weights(hf_model, cfg)
+        elif cfg.original_architecture == "PhiMoEForCausalLM":
+            state_dict = convert_phimoe_weights(hf_model, cfg)
         elif cfg.original_architecture == "GemmaForCausalLM":
             state_dict = convert_gemma_weights(hf_model, cfg)
         elif cfg.original_architecture == "Gemma2ForCausalLM":
