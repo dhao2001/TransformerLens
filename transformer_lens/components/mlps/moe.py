@@ -33,9 +33,9 @@ class MoEGatedMLP(nn.Module):
         if self.d_mlp is None:
             raise ValueError("d_mlp must be set to use an MLP")
 
-        self.W_in = nn.Linear(self.cfg.d_model, self.d_mlp, bias=False)
-        self.W_out = nn.Linear(self.d_mlp, self.cfg.d_model, bias=False)
-        self.W_gate = nn.Linear(self.cfg.d_model, self.d_mlp, bias=False)
+        self.W_in = nn.Linear(self.cfg.d_model, self.d_mlp, bias=False, dtype=self.cfg.dtype)
+        self.W_out = nn.Linear(self.d_mlp, self.cfg.d_model, bias=False, dtype=self.cfg.dtype)
+        self.W_gate = nn.Linear(self.cfg.d_model, self.d_mlp, bias=False, dtype=self.cfg.dtype)
 
         # hook on gate output but before act_fn
         self.hook_gate = HookPoint()  # [batch, pos, d_mlp]
@@ -69,7 +69,9 @@ class MoE(CanBeUsedAsMLP):
         ), "experts_per_token must be less than or equal to num_experts"
 
         self.experts = nn.ModuleList([MoEGatedMLP(self.cfg) for _ in range(self.num_experts)])
-        self.W_gate = nn.Linear(self.cfg.d_model, self.cfg.num_experts, bias=False)
+        self.W_gate = nn.Linear(
+            self.cfg.d_model, self.cfg.num_experts, bias=False, dtype=self.cfg.dtype
+        )
 
         # Hook on the weights of selected experts [batch pos experts_per_token]
         self.hook_expert_weights = HookPoint()

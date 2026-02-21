@@ -37,6 +37,7 @@ from transformer_lens.pretrained.weight_conversions import (
     convert_neel_solu_old_weights,
     convert_neo_weights,
     convert_neox_weights,
+    convert_olmoe_weights,
     convert_opt_weights,
     convert_phi3_weights,
     convert_phimoe_weights,
@@ -713,6 +714,32 @@ def convert_hf_model_config(model_name: str, **kwargs: Any) -> dict[str, Any]:
             "use_qk_norm": True,
             "trust_remote_code": True,
         }
+    elif architecture == "OlmoeForCausalLM":
+        # Architecture for microsoft/phi-3.5-moe models
+        cfg_dict = {
+            "d_model": hf_config.hidden_size,
+            "d_head": hf_config.hidden_size // hf_config.num_attention_heads,
+            "n_heads": hf_config.num_attention_heads,
+            "d_mlp": hf_config.intermediate_size,
+            "n_layers": hf_config.num_hidden_layers,
+            "n_key_value_heads": hf_config.num_key_value_heads,
+            "n_ctx": hf_config.max_position_embeddings,
+            "eps": hf_config.rms_norm_eps,
+            "d_vocab": hf_config.vocab_size,
+            "act_fn": hf_config.hidden_act,
+            "initializer_range": hf_config.initializer_range,
+            "normalization_type": "RMS",
+            "positional_embedding_type": "rotary",
+            "trust_remote_code": True,
+            "rotary_base": hf_config.rope_theta,
+            "use_attn_scale": True,
+            "gated_mlp": True,
+            "parallel_attn_mlp": False,
+            "rotary_dim": hf_config.hidden_size // hf_config.num_attention_heads,
+            "num_experts": hf_config.num_experts,
+            "experts_per_token": hf_config.num_experts_per_tok,
+            "final_rms": True,
+        }
     elif architecture == "PhiForCausalLM":
         # Architecture for microsoft/phi models
         cfg_dict = {
@@ -1336,6 +1363,8 @@ def get_pretrained_state_dict(
             state_dict = convert_qwen2_weights(hf_model, cfg)
         elif cfg.original_architecture == "Qwen3ForCausalLM":
             state_dict = convert_qwen3_weights(hf_model, cfg)
+        elif cfg.original_architecture == "OlmoeForCausalLM":
+            state_dict = convert_olmoe_weights(hf_model, cfg)
         elif cfg.original_architecture == "PhiForCausalLM":
             state_dict = convert_phi_weights(hf_model, cfg)
         elif cfg.original_architecture == "Phi3ForCausalLM":
